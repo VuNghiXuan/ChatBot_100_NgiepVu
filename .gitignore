@@ -1,0 +1,51 @@
+# 1. API Keys và Bí mật (QUAN TRỌNG NHẤT)
+.env
+*.env
+keys.json
+
+# 2. Môi trường ảo (Virtual Environments)
+env/
+venv/
+.venv/
+ENV/
+bin/
+include/
+lib/
+share/
+
+# 3. Python rác
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 4. Streamlit & Logs
+.streamlit/config.toml
+*.log
+
+# 5. Dữ liệu và Vector DB (Nếu mày không muốn đẩy cả nghìn file rác lên)
+data/
+chroma_db/
+vector_store/
+faiss_index/
+
+# 6. File rác hệ thống và IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Build và EXE (PyInstaller, Nuitka, v.v.) ---
+build/
+dist/
+*.spec
+*.exe
+*.msi
+*.bin
+
+# Thư mục tạm khi chạy exe
+_pycache_/
+.python-version
+
+# Database
+vector_db/

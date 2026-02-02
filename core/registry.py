@@ -5,7 +5,7 @@ class TaskRegistry:
     # Sau này anh thêm 100 nghiệp vụ vào đây chỉ bằng cách thêm dòng
     TASKS = {
         "gia_vang": {
-            "description": "Tra cứu giá vàng hôm nay, giá mua vào bán ra, biểu đồ giá.",
+            "description": "Tra cứu giá vàng hôm nay, giá mua vào bán ra, giá đổi các loại vàng.",
             "source_type": "FILE",
             "file_path": "data/database/gia_vang.xlsx"
         },
@@ -15,9 +15,9 @@ class TaskRegistry:
             "api_url": "https://api.tiemvang.com/pawn-policy"
         },
         "bao_hanh": {
-            "description": "Chính sách bảo hành, đánh bóng, sửa chữa sản phẩm.",
+            "description": "Chính sách bảo hành, đánh bóng, sửa chữa sản phẩm, chính sách mua bán, đổi trả.",
             "source_type": "FILE",
-            "file_path": "data/training/bao_hanh.docx"
+            "file_path": "data/training/Quy_dinh_tiem_vang.docx"
         }
     }
 
