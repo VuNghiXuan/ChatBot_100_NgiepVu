@@ -60,3 +60,9 @@ class LLMInstance:
         response = self.model.invoke(prompt)
         # LangChain trả về kết quả trong trường .content
         return response.content
+    
+    # HÀM MỚI: Chat bất đồng bộ để tối ưu tốc độ
+    async def chat_async(self, prompt: str):
+        # Sử dụng ainvoke là bản async của invoke trong LangChain
+        response = await self.model.ainvoke(prompt)
+        return response.content

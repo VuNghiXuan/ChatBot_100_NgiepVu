@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 import pandas as pd
 import sqlite3
+import asyncio  # Bổ sung thư viện này để chạy Async
 
 # Import các thành phần cốt lõi
 from core.llm_factory import LLMFactory
@@ -33,7 +34,6 @@ st.markdown("---")
 with st.sidebar:
     st.header("⚙️ Cấu hình hệ thống")
     
-    # Bổ sung chọn nhà cung cấp LLM
     selected_provider = st.selectbox(
         "Chọn não bộ AI (LLM Provider):",
         options=["Gemini", "Groq", "Ollama"],
@@ -41,7 +41,6 @@ with st.sidebar:
         help="Gemini/Groq yêu cầu Internet, Ollama chạy Offline trên máy cục bộ."
     )
     
-    # Nút cập nhật hệ thống
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🚀 Áp dụng AI"):
@@ -55,7 +54,6 @@ with st.sidebar:
     st.divider()
     st.info("Chế độ: **Hybrid Mode** (File/DB/API Auto-detect)")
     
-    # Nút xóa lịch sử chat tạm thời trên giao diện
     if st.button("🗑 Xóa lịch sử Chat"):
         st.session_state.messages = []
         st.rerun()
@@ -65,16 +63,15 @@ if "orchestrator" not in st.session_state:
     with st.spinner(f"Đang khởi động Agent với {selected_provider}..."):
         st.session_state.orchestrator = init_system(selected_provider)
 
-# Quản lý lịch sử chat (Hiển thị trên UI)
+# Quản lý lịch sử chat (UI)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Layout chia làm 2 cột: Cột trái Chat - Cột phải Nhật ký DB
+# Layout chia cột
 chat_col, log_col = st.columns([2, 1])
 
 with chat_col:
     st.subheader("💬 Trò chuyện")
-    # Hiển thị các tin nhắn cũ
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -91,8 +88,10 @@ with chat_col:
             else:
                 with st.spinner(f"AI ({selected_provider}) đang xử lý..."):
                     try:
-                        # Orchestrator sẽ tự động lưu vào DB history.db
-                        response = st.session_state.orchestrator.handle_request(prompt)
+                        # QUAN TRỌNG: Gọi handle_request thông qua asyncio.run
+                        # vì hàm này đã được chuyển thành async def trong orchestrator.py
+                        response = asyncio.run(st.session_state.orchestrator.handle_request(prompt))
+                        
                         st.markdown(response)
                         st.session_state.messages.append({"role": "assistant", "content": response})
                     except Exception as e:
@@ -100,12 +99,13 @@ with chat_col:
 
 with log_col:
     st.subheader("📜 Nhật ký Database")
+    # Sử dụng placeholder để UI tự cập nhật mượt mà hơn
+    log_placeholder = st.empty()
     try:
-        # Đọc dữ liệu từ SQLite để hiển thị lên UI Admin
         conn = sqlite3.connect("data/database/history.db")
-        query = "SELECT timestamp, task_name, user_query FROM chat_history ORDER BY id DESC LIMIT 10"
+        query = "SELECT timestamp, task_name, user_query FROM chat_history ORDER BY id DESC LIMIT 15"
         df = pd.read_sql_query(query, conn)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        log_placeholder.dataframe(df, use_container_width=True, hide_index=True)
         conn.close()
     except Exception:
         st.write("Chưa có dữ liệu nhật ký.")
