@@ -50,9 +50,11 @@ class LLMFactory:
         raise ValueError(f"Nhà cung cấp {provider} chưa được hỗ trợ!")
 
 class LLMInstance:
-    """Lớp bọc để thống nhất cách gọi hàm chat giữa các nhà cung cấp"""
-    def __init__(self, model):
+    def __init__(self, model, provider_name):
+        """Lớp bọc để thống nhất cách gọi hàm chat giữa các nhà cung cấp"""
+
         self.model = model
+        self.provider_name = provider_name # Lưu tên để biết câu này do AI nào trả lời
 
     def chat(self, prompt: str):
         response = self.model.invoke(prompt)

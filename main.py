@@ -1,6 +1,8 @@
 import streamlit as st
 from dotenv import load_dotenv
 import os
+import pandas as pd
+import sqlite3
 
 # Import các thành phần cốt lõi
 from core.llm_factory import LLMFactory
@@ -14,9 +16,9 @@ st.set_page_config(page_title="AI Tiệm Vàng - Enterprise Agent", layout="wide
 def init_system(provider):
     """Khởi tạo bộ não của hệ thống dựa trên nhà cung cấp được chọn"""
     try:
-        # LLMFactory sẽ tự động lấy API Key từ .env tương ứng với provider
+        # LLMFactory tự động lấy API Key từ .env tương ứng với provider
         llm = LLMFactory.get_model(provider)
-        # Khởi tạo bộ điều phối
+        # Khởi tạo bộ điều phối (Đã bao gồm lưu trữ DB bên trong)
         return Orchestrator(llm)
     except Exception as e:
         st.error(f"Lỗi khởi tạo hệ thống: {str(e)}")
@@ -39,7 +41,7 @@ with st.sidebar:
         help="Gemini/Groq yêu cầu Internet, Ollama chạy Offline trên máy cục bộ."
     )
     
-    # Nút cập nhật hệ thống khi đổi Provider hoặc Re-index dữ liệu
+    # Nút cập nhật hệ thống
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🚀 Áp dụng AI"):
@@ -52,41 +54,58 @@ with st.sidebar:
 
     st.divider()
     st.info("Chế độ: **Hybrid Mode** (File/DB/API Auto-detect)")
+    
+    # Nút xóa lịch sử chat tạm thời trên giao diện
+    if st.button("🗑 Xóa lịch sử Chat"):
+        st.session_state.messages = []
+        st.rerun()
 
-# Khởi tạo bộ não lần đầu (Nếu chưa có trong session_state)
+# Khởi tạo bộ não lần đầu
 if "orchestrator" not in st.session_state:
     with st.spinner(f"Đang khởi động Agent với {selected_provider}..."):
         st.session_state.orchestrator = init_system(selected_provider)
 
-# Quản lý lịch sử chat
+# Quản lý lịch sử chat (Hiển thị trên UI)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Hiển thị các tin nhắn cũ
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# Layout chia làm 2 cột: Cột trái Chat - Cột phải Nhật ký DB
+chat_col, log_col = st.columns([2, 1])
 
-# --- LUỒNG XỬ LÝ CHÍNH ---
+with chat_col:
+    st.subheader("💬 Trò chuyện")
+    # Hiển thị các tin nhắn cũ
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-if prompt := st.chat_input("Hỏi tôi về giá vàng, chính sách cầm đồ hoặc bảo hành..."):
-    # 1. Hiển thị câu hỏi của khách
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    # Luồng xử lý chính
+    if prompt := st.chat_input("Hỏi tôi về giá vàng, chính sách cầm đồ..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-    # 2. Agent xử lý (Tìm nghiệp vụ -> Kết nối dữ liệu -> Suy luận)
-    with st.chat_message("assistant"):
-        if st.session_state.orchestrator is None:
-            st.error("Hệ thống chưa được khởi tạo. Vui lòng kiểm tra cấu hình .env và chọn lại AI.")
-        else:
-            with st.spinner(f"AI ({selected_provider}) đang xử lý..."):
-                try:
-                    # Gọi bộ điều phối để xử lý câu hỏi
-                    response = st.session_state.orchestrator.handle_request(prompt)
-                    st.markdown(response)
-                    
-                    # Lưu vào lịch sử
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-                except Exception as e:
-                    st.error(f"Đã xảy ra lỗi: {str(e)}")
+        with st.chat_message("assistant"):
+            if st.session_state.orchestrator is None:
+                st.error("Hệ thống chưa được khởi tạo. Kiểm tra .env!")
+            else:
+                with st.spinner(f"AI ({selected_provider}) đang xử lý..."):
+                    try:
+                        # Orchestrator sẽ tự động lưu vào DB history.db
+                        response = st.session_state.orchestrator.handle_request(prompt)
+                        st.markdown(response)
+                        st.session_state.messages.append({"role": "assistant", "content": response})
+                    except Exception as e:
+                        st.error(f"Đã xảy ra lỗi: {str(e)}")
+
+with log_col:
+    st.subheader("📜 Nhật ký Database")
+    try:
+        # Đọc dữ liệu từ SQLite để hiển thị lên UI Admin
+        conn = sqlite3.connect("data/database/history.db")
+        query = "SELECT timestamp, task_name, user_query FROM chat_history ORDER BY id DESC LIMIT 10"
+        df = pd.read_sql_query(query, conn)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        conn.close()
+    except Exception:
+        st.write("Chưa có dữ liệu nhật ký.")
