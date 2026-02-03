@@ -14,48 +14,63 @@ from core.orchestrator import Orchestrator
 
 # 1. Cấu hình giao diện
 load_dotenv()
-st.set_page_config(page_title="AI Tiệm Vàng - Enterprise Agent", layout="wide")
+st.set_page_config(page_title="AI Tiệm Vàng - Vũ Nghi Xuân", layout="wide", page_icon="💎")
 
-# --- HÀM KHỞI TẠO ---
+# --- HÀM KHỞI TẠO HỆ THỐNG (ĐÃ TỐI ƯU) ---
 def init_system(provider):
+    """Khởi tạo toàn bộ não bộ và công cụ điều phối"""
     try:
+        # Xóa cache cũ nếu có để đảm bảo nạp lại file mới (Excel, Word)
+        st.cache_resource.clear() 
+        
+        # 1. Lấy model AI từ Factory
         llm = LLMFactory.get_model(provider)
-        return Orchestrator(llm)
+        
+        # 2. Khởi tạo Orchestrator 
+        # (Nó sẽ tự gọi SmartConnector và nạp lại Engines bên trong)
+        return Orchestrator(llm) 
+        
     except Exception as e:
-        st.error(f"Lỗi khởi tạo hệ thống: {str(e)}")
+        st.error(f"❌ Lỗi khởi tạo hệ thống: {str(e)}")
         return None
 
+# --- XỬ LÝ SỰ KIỆN ---
 def on_provider_change():
-    new_provider = st.session_state.provider_selector
-    st.session_state.orchestrator = init_system(new_provider)
+    st.session_state.orchestrator = init_system(st.session_state.provider_selector)
+
+# --- KHỞI TẠO SESSION STATE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "orchestrator" not in st.session_state:
+    # Mặc định lấy Ollama hoặc cái đầu tiên trong danh sách
+    st.session_state.orchestrator = init_system("Ollama")
 
 # --- GIAO DIỆN SIDEBAR ---
 with st.sidebar:
-    st.header("⚙️ Cấu hình hệ thống")
+    st.header("💎 Vũ Nghi Xuân Admin")
+    
     options = ["Ollama", "Gemini", "Groq"]
     st.selectbox(
-        "Chọn não bộ AI (LLM Provider):",
+        "Chọn não bộ AI:",
         options=options,
         index=0,
         key="provider_selector",
         on_change=on_provider_change
     )
     
-    if st.button("🔄 Làm mới dữ liệu (Re-index)", width='stretch'):
-        st.cache_resource.clear()
-        st.success("Đã làm mới dữ liệu kiến thức!")
-
     st.divider()
-    if st.button("🗑 Xóa lịch sử Chat", width='stretch'):
+    
+    # NÚT LÀM MỚI QUAN TRỌNG NHẤT
+    if st.button("🔄 Làm mới dữ liệu (Re-index)", use_container_width=True):
+        with st.spinner("Đang nạp lại dữ liệu toàn hệ thống..."):
+            st.session_state.orchestrator = init_system(st.session_state.provider_selector)
+            st.success("✅ Đã cập nhật giá vàng & chính sách mới!")
+            st.rerun()
+
+    if st.button("🗑 Xóa lịch sử Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-
-# Khởi tạo mặc định
-if "orchestrator" not in st.session_state:
-    st.session_state.orchestrator = init_system("Ollama")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
 
 # --- LAYOUT CHÍNH ---
 st.title("🤖 Trợ Lý AI Tiệm Vàng Đa Nghiệp Vụ")
@@ -64,47 +79,46 @@ st.markdown("---")
 chat_col, log_col = st.columns([2, 1])
 
 with chat_col:
-    st.subheader("💬 Trò chuyện")
+    st.subheader("💬 Trò chuyện trực tuyến")
     
-    # Khu vực hiển thị tin nhắn (có thanh cuộn)
-    chat_container = st.container(height=600) 
+    chat_container = st.container(height=550) 
     
     with chat_container:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                # Nếu là tin nhắn của Assistant, hiển thị kèm nhãn nghiệp vụ nếu có
                 if message["role"] == "assistant" and "tasks" in message:
-                    tag_html = "".join([f'<span style="background-color: #e1f5fe; color: #01579b; padding: 2px 10px; border-radius: 15px; font-size: 11px; font-weight: bold; margin-right: 5px; border: 1px solid #b3e5fc;">🔍 {t.upper()}</span>' for t in message["tasks"]])
-                    st.markdown(tag_html, unsafe_allow_html=True)
+                    # Hiển thị nhãn nghiệp vụ (Tag)
+                    tags = "".join([f'<span style="background-color: #fff3e0; color: #e65100; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 5px; border: 1px solid #ffcc80;">⚙️ {t.upper()}</span>' for t in message["tasks"]])
+                    st.markdown(tags, unsafe_allow_html=True)
                 st.markdown(message["content"])
 
     # Xử lý tin nhắn mới
-    if prompt := st.chat_input("Hỏi tôi về giá vàng, chính sách bảo hành..."):
+    if prompt := st.chat_input("Giá vàng 18k hôm nay bao nhiêu?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        # Hiển thị phản hồi của Assistant
         with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
+                
             with st.chat_message("assistant"):
                 current_p = st.session_state.provider_selector
-                with st.spinner(f"AI ({current_p}) đang phân tích..."):
+                with st.spinner(f"Đang tra cứu hệ thống ({current_p})..."):
                     try:
+                        # Gọi Orchestrator bằng Async
                         loop = asyncio.get_event_loop()
-                        # Gọi Orchestrator xử lý
                         response = loop.run_until_complete(
                             st.session_state.orchestrator.handle_request(prompt)
                         )
                         
-                        # LẤY DANH SÁCH NGHIỆP VỤ TỪ SESSION STATE (Do Orchestrator lưu vào)
                         detected_tasks = st.session_state.get("last_tasks", [])
                         
-                        # HIỂN THỊ NHÃN NGHIỆP VỤ NGAY LẬP TỨC
                         if detected_tasks:
-                            tag_html = "".join([f'<span style="background-color: #e1f5fe; color: #01579b; padding: 2px 10px; border-radius: 15px; font-size: 11px; font-weight: bold; margin-right: 5px; border: 1px solid #b3e5fc;">🔍 {t.upper()}</span>' for t in detected_tasks])
-                            st.markdown(tag_html, unsafe_allow_html=True)
+                            tags = "".join([f'<span style="background-color: #fff3e0; color: #e65100; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 5px; border: 1px solid #ffcc80;">⚙️ {t.upper()}</span>' for t in detected_tasks])
+                            st.markdown(tags, unsafe_allow_html=True)
                         
                         st.markdown(response)
                         
-                        # Lưu vào lịch sử kèm theo danh sách task để khi load lại vẫn thấy tag
+                        # Lưu vào lịch sử
                         st.session_state.messages.append({
                             "role": "assistant", 
                             "content": response,
@@ -113,35 +127,30 @@ with chat_col:
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Lỗi: {str(e)}")
+                        st.error(f"Lỗi xử lý: {str(e)}")
 
-
-
+# --- CỘT NHẬT KÝ DATABASE ---
 with log_col:
-    st.subheader("📜 Nhật ký Database")
-    log_placeholder = st.empty()
+    st.subheader("📜 Nhật ký hệ thống")
     db_path = "data/database/history.db"
     
     if os.path.exists(db_path):
         try:
+            # Dùng context manager để tránh treo file SQLite
             with sqlite3.connect(db_path) as conn:
-                # 1. Kiểm tra xem bảng có cột 'task_names' chưa
-                cursor = conn.cursor()
-                cursor.execute("PRAGMA table_info(chat_history)")
-                columns = [column[1] for column in cursor.fetchall()]
-                
-                # 2. Nếu là bảng cũ (task_name), ta tự động đổi tên cột hoặc dùng Alias
-                query_col = "task_names" if "task_names" in columns else "task_name AS task_names"
-                
-                query = f"SELECT timestamp, {query_col}, user_query FROM chat_history ORDER BY id DESC LIMIT 15"
-                df = pd.read_sql_query(query, conn)
+                df = pd.read_sql_query("""
+                    SELECT timestamp as 'Thời gian', 
+                           task_names as 'Nghiệp vụ', 
+                           user_query as 'Câu hỏi' 
+                    FROM chat_history 
+                    ORDER BY id DESC LIMIT 15
+                """, conn)
                 
                 if not df.empty:
-                    log_placeholder.dataframe(df, width='stretch', hide_index=True)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
-                    st.info("Chưa có cuộc hội thoại nào được lưu.")
+                    st.info("Chưa có dữ liệu hội thoại.")
         except Exception as e:
-            # Hiện lỗi thật để anh em mình dễ bắt bệnh
-            st.error(f"Lỗi truy xuất DB: {str(e)}")
+            st.info("Đang chờ dữ liệu mới...")
     else:
-        st.info("Đang chờ tạo file dữ liệu...")
+        st.info("Hệ thống nhật ký đang khởi tạo...")
