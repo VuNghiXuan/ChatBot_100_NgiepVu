@@ -61,14 +61,20 @@ with st.sidebar:
     
     st.divider()
     
-    # NÚT LÀM MỚI QUAN TRỌNG NHẤT
-    if st.button("🔄 Làm mới dữ liệu (Re-index)", use_container_width=True):
-        with st.spinner("Đang nạp lại dữ liệu toàn hệ thống..."):
+    # NÚT LÀM MỚI (CẬP NHẬT)
+    if st.button("🔄 Làm mới dữ liệu (Re-index)", width="stretch"):
+        with st.spinner("Đang xóa bộ nhớ đệm và nạp lại dữ liệu..."):
+            # 1. Xóa bộ nhớ đệm của Connector (nếu có)
+            if hasattr(st.session_state.orchestrator.connector, 'clear_cache'):
+                st.session_state.orchestrator.connector.clear_cache()
+                
+            # 2. Khởi tạo lại toàn bộ hệ thống
             st.session_state.orchestrator = init_system(st.session_state.provider_selector)
-            st.success("✅ Đã cập nhật giá vàng & chính sách mới!")
+            
+            st.success("✅ Đã cập nhật giá vàng & chính sách mới từ file!")
             st.rerun()
 
-    if st.button("🗑 Xóa lịch sử Chat", use_container_width=True):
+    if st.button("🗑 Xóa lịch sử Chat", width="stretch"):
         st.session_state.messages = []
         st.rerun()
 
@@ -93,7 +99,7 @@ with chat_col:
                 st.markdown(message["content"])
 
     # Xử lý tin nhắn mới
-    if prompt := st.chat_input("Giá vàng 18k hôm nay bao nhiêu?"):
+    if prompt := st.chat_input("Hãy đặt câu hỏi về nghiệp vụ vàng trang sức?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with chat_container:
@@ -147,7 +153,7 @@ with log_col:
                 """, conn)
                 
                 if not df.empty:
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(df, width="stretch", hide_index=True)
                 else:
                     st.info("Chưa có dữ liệu hội thoại.")
         except Exception as e:

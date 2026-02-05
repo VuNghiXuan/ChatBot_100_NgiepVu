@@ -36,6 +36,10 @@ class SmartConnector:
         self._engine_cache[task_name] = engine
         return engine
 
+    def clear_cache(self):
+        """Xóa sạch các engine cũ để ép hệ thống đọc lại file từ ổ cứng"""
+        self.engines = {}
+
     def get_data(self, task_name, query):
         """Hàm này để Orchestrator gọi lấy dữ liệu"""
         engine = self.get_engine(task_name)
